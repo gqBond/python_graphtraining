@@ -3,7 +3,6 @@ import gym
 from gym import spaces
 from stable_baselines3 import PPO
 from scipy.spatial import ConvexHull
-from datetime import datetime
 
 
 class Env(gym.Env):
