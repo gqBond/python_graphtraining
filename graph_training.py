@@ -3,6 +3,7 @@ import gym
 from gym import spaces
 from stable_baselines3 import PPO
 from scipy.spatial import ConvexHull
+from datetime import datetime
 
 
 class Env(gym.Env):
@@ -18,8 +19,9 @@ class Env(gym.Env):
 
         # 初始化奖励权重
         self.weight_num_points = 0.000001  # 点的数量的权重
-        self.weight_area = 100000.0      # 最大化围成的面积的权重
+        self.weight_area = 1000000.0      # 最大化围成的面积的权重
 
+        self.reset_threshold = 10
     def step(self, action):
         # 执行动作
         x, y = divmod(action, 16)
@@ -28,13 +30,12 @@ class Env(gym.Env):
         # 计算奖励
         num_selected_points = np.sum(self.state, dtype=np.int64)
         area = self.calculate_selected_area()
-
         # 使用最小化点的数量和最大化围成的面积作为奖励
         reward_num_points = -num_selected_points * self.weight_num_points
         reward_area = area * self.weight_area
 
         # 定义完成任务的条件
-        done = num_selected_points == 16 * 16
+        done = num_selected_points > self.reset_threshold
 
         return self.state.copy(), reward_num_points + reward_area, done, {}
 
@@ -58,7 +59,8 @@ class Env(gym.Env):
 
     def reset(self):
         # 重置环境状态
-        self.state = np.zeros((16, 16), dtype=np.int64)
+        if(np.sum(self.state) > self.reset_threshold):
+            self.state = np.zeros((16, 16), dtype=np.int64)
         return self.state.copy()
 
     def render(self, mode='human'):
@@ -68,17 +70,21 @@ class Env(gym.Env):
 # 创建环境
 env = Env()
 
+# 创建日志
+log_dir = "./ppo_custom_env_tensorboard/PPO_" + datetime.now().strftime("%Y%m%d-%H%M%S")
+
 
 # 用PPO算法进行训练
 model = PPO("MlpPolicy", env,
-            learning_rate=0.005,
+            learning_rate=0.0005,
             clip_range=0.1,
             ent_coef=0.01,
             gamma=0.99,
-            gae_lambda=0.95,
-            verbose=1)
+            gae_lambda=0.96,
+            verbose=1,
+            tensorboard_log=log_dir)
 
-model.learn(total_timesteps=200000, log_interval=1)
+model.learn(total_timesteps=500000, log_interval=1)
 
 # 保存训练好的模型
 model.save("ppo_custom_env")
